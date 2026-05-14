@@ -1,0 +1,5 @@
+services:
+  app:
+    container_name: sah-admin-stg
+    ports:
+      - "3010:3000"
