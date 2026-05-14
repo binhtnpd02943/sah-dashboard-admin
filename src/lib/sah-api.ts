@@ -103,23 +103,32 @@ export async function postJson(
   body: unknown,
   token?: string,
 ): Promise<UpstreamResult> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Accept: "application/json, text/plain, */*",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-    signal: AbortSignal.timeout(90_000),
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(60_000), // 60s timeout
+    });
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    data: await readUpstreamBody(response),
-  };
+    return {
+      ok: response.ok,
+      status: response.status,
+      data: await readUpstreamBody(response),
+    };
+  } catch (error) {
+    console.error(`[API Error] Failed to fetch ${url}:`, error);
+    return {
+      ok: false,
+      status: 502,
+      data: { message: error instanceof Error ? error.message : "Connection failed" },
+    };
+  }
 }
 
 export function upstreamStatus(result: UpstreamResult) {

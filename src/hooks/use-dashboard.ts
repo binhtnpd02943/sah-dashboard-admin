@@ -92,7 +92,7 @@ export function useDashboard() {
       [
         {
           ...item,
-          id: crypto.randomUUID(),
+          id: Date.now().toString(36) + Math.random().toString(36).substring(2),
           createdAt: new Date().toISOString(),
         },
         ...current,
