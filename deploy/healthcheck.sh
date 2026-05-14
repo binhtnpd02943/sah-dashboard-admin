@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 ENV=${1:-staging}
 PORT=$([ "$ENV" == "production" ] && echo 3000 || echo 3010)
-URL="http://localhost:$PORT/api/health"
+URL="http://127.0.0.1:$PORT/api/health"
 
 echo "-> Healthcheck: $URL"
 
