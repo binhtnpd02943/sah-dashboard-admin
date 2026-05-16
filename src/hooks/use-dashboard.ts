@@ -7,9 +7,13 @@ import {
   Session,
   AccountForm,
   UpLevelForm,
+  SieuBaHoForm,
+  DatKhongNguoiForm,
   HistoryItem,
   LogItem,
   UpLevelStatus,
+  SieuBaHoStatus,
+  DatKhongNguoiStatus,
 } from '@/types/dashboard';
 import {
   callInternalApi,
@@ -26,6 +30,8 @@ import {
 const SESSION_KEY = 'sah-next-session:v1';
 const DEFAULT_WORKER_URL = 'https://worker4-2.tool-sah.pro.vn';
 const LOG_FEATURE = 'up-level';
+const SBH_LOG_FEATURE = 'sieu-ba-ho';
+const DKN_LOG_FEATURE = 'dat-khong-nguoi';
 
 export function useDashboard() {
   const [session, setSession] = useState<Session | null>(null);
@@ -48,6 +54,31 @@ export function useDashboard() {
     logFull: true,
     proxyMode: 'off',
   });
+  const [sieuBaHoForm, setSieuBaHoForm] = useState<SieuBaHoForm>({
+    configIds: '',
+    delay: 1000,
+    concurrency: 3,
+    maxAuto: 3,
+    buyItems: false,
+    runMode: 'play',
+    buyShopIndex: '',
+    buyShopSlot: '',
+    buyQuantity: 1,
+    logFull: true,
+    proxyMode: 'off',
+  });
+  const [datKhongNguoiForm, setDatKhongNguoiForm] = useState<DatKhongNguoiForm>({
+    configIds: '',
+    delay: 1400,
+    concurrency: 3,
+    loaiHatGiong: '39',
+    tromNroMode: false,
+    autoCanBinh: true,
+    mode: 'trom',
+    logFull: true,
+    proxyMode: 'off',
+    forceStart: true,
+  });
 
   const [loading, setLoading] = useState<LoadingAction>(null);
   const [lastResult, setLastResult] = useState<unknown>(null);
@@ -57,6 +88,8 @@ export function useDashboard() {
   const [logError, setLogError] = useState('');
 
   const [upLevelStatus, setUpLevelStatus] = useState<UpLevelStatus | null>(null);
+  const [sieuBaHoStatus, setSieuBaHoStatus] = useState<SieuBaHoStatus | null>(null);
+  const [datKhongNguoiStatus, setDatKhongNguoiStatus] = useState<DatKhongNguoiStatus | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const streamKeyRef = useRef('');
 
@@ -111,10 +144,10 @@ export function useDashboard() {
     window.localStorage.removeItem(SESSION_KEY);
   }, []);
 
-  const appendLogs = useCallback((payload: unknown) => {
+  const appendLogs = useCallback((payload: unknown, featureFilter = LOG_FEATURE) => {
     const payloads = collectLogPayloads(payload);
     const normalized = payloads
-      .map((item, index) => normalizeLog(item, index, LOG_FEATURE))
+      .map((item, index) => normalizeLog(item, index, featureFilter))
       .filter((item): item is LogItem => Boolean(item));
 
     if (normalized.length) {
@@ -203,6 +236,54 @@ export function useDashboard() {
     return () => clearInterval(timer);
   }, [activeScreen, session, fetchStatus]);
 
+  const fetchSieuBaHoStatus = useCallback(async () => {
+    if (!session?.token) return;
+    try {
+      const response = await callInternalApi('/api/sieu-ba-ho/status', { workerUrl }, session.token);
+      const data = response.data as any;
+      if (response.ok && data?.status) {
+        setSieuBaHoStatus(data.status);
+      }
+    } catch {
+      // Silent error
+    }
+  }, [session, workerUrl]);
+
+  useEffect(() => {
+    if (!session || !['overview', 'sieu-ba-ho'].includes(activeScreen)) {
+      setSieuBaHoStatus(null);
+      return;
+    }
+
+    fetchSieuBaHoStatus();
+    const timer = setInterval(fetchSieuBaHoStatus, 5000);
+    return () => clearInterval(timer);
+  }, [activeScreen, session, fetchSieuBaHoStatus]);
+
+  const fetchDatKhongNguoiStatus = useCallback(async () => {
+    if (!session?.token) return;
+    try {
+      const response = await callInternalApi('/api/dat-khong-nguoi/status', { workerUrl }, session.token);
+      const data = response.data as any;
+      if (response.ok && data?.status) {
+        setDatKhongNguoiStatus(data.status);
+      }
+    } catch {
+      // Silent error
+    }
+  }, [session, workerUrl]);
+
+  useEffect(() => {
+    if (!session || !['overview', 'dat-khong-nguoi'].includes(activeScreen)) {
+      setDatKhongNguoiStatus(null);
+      return;
+    }
+
+    fetchDatKhongNguoiStatus();
+    const timer = setInterval(fetchDatKhongNguoiStatus, 5000);
+    return () => clearInterval(timer);
+  }, [activeScreen, session, fetchDatKhongNguoiStatus]);
+
   const loadLogHistory = useCallback(async () => {
     if (!session) return;
     setLoading('history');
@@ -225,7 +306,7 @@ export function useDashboard() {
   }, [session, workerUrl]);
 
   useEffect(() => {
-    if (!session || !['up-level', 'logs'].includes(activeScreen)) return;
+    if (!session || !['up-level', 'sieu-ba-ho', 'dat-khong-nguoi', 'logs'].includes(activeScreen)) return;
     openLogStream();
   }, [activeScreen, openLogStream, session]);
 
@@ -376,6 +457,165 @@ export function useDashboard() {
     }
   }, [session, workerUrl, pushHistory, appendLogs]);
 
+  const handleStartSieuBaHo = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session) return;
+    setLoading('sieu-ba-ho');
+
+    const configIds = sieuBaHoForm.configIds.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean);
+
+    try {
+      const response = await callInternalApi(
+        '/api/sieu-ba-ho/start',
+        { ...sieuBaHoForm, configIds, workerUrl },
+        session.token
+      );
+      setLastResult(response.data);
+      pushHistory({
+        title: `Siêu Bá Hộ (${configIds.length} config)`,
+        status: response.status,
+        data: response.data,
+      });
+      setActiveScreen('sieu-ba-ho');
+      openLogStream();
+
+      // Quick status snapshot
+      void (async () => {
+        try {
+          const statusResp = await callInternalApi('/api/sieu-ba-ho/status', { workerUrl }, session.token);
+          const st = (statusResp.data as any)?.status;
+          if (st) {
+            appendLogs({
+              logs: [{
+                id: `sbh-status-init-${Date.now()}`,
+                kind: st.isRunning ? 'start' : 'stop',
+                message: `Siêu Bá Hộ: ${st.isRunning ? 'Đang chạy' : 'Đang chờ'} (Hoàn thành: ${st.completedCount ?? 0}/${st.totalCount ?? 0})`,
+                timestamp: new Date().toISOString(),
+                featureName: SBH_LOG_FEATURE,
+              }]
+            }, SBH_LOG_FEATURE);
+          }
+        } catch {
+          // Silent fail
+        }
+      })();
+    } catch (error) {
+      setLastResult({ success: false, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+    } finally {
+      setLoading(null);
+    }
+  }, [sieuBaHoForm, session, workerUrl, pushHistory, openLogStream, appendLogs]);
+
+  const handleStopSieuBaHo = useCallback(async () => {
+    if (!session) return;
+    setLoading('sieu-ba-ho');
+    try {
+      const response = await callInternalApi(
+        '/api/sieu-ba-ho/stop',
+        { workerUrl },
+        session.token
+      );
+      setLastResult(response.data);
+      pushHistory({
+        title: 'Stop Siêu Bá Hộ',
+        status: response.status,
+        data: response.data,
+      });
+      appendLogs({
+        logs: [{
+          id: `sbh-stop-req-${Date.now()}`,
+          kind: 'stop',
+          message: 'Siêu Bá Hộ: Gửi yêu cầu dừng...',
+          timestamp: new Date().toISOString(),
+          featureName: SBH_LOG_FEATURE,
+        }]
+      }, SBH_LOG_FEATURE);
+    } catch (error) {
+      setLastResult({ success: false, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+    } finally {
+      setLoading(null);
+    }
+  }, [session, workerUrl, pushHistory, appendLogs]);
+
+  const handleStartDatKhongNguoi = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session) return;
+    setLoading('dat-khong-nguoi');
+
+    const configIds = datKhongNguoiForm.configIds.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean);
+
+    try {
+      const response = await callInternalApi(
+        '/api/dat-khong-nguoi/start',
+        { ...datKhongNguoiForm, configIds, workerUrl },
+        session.token
+      );
+      setLastResult(response.data);
+      pushHistory({
+        title: `Đất Không Người (${configIds.length} config)`,
+        status: response.status,
+        data: response.data,
+      });
+      setActiveScreen('dat-khong-nguoi');
+      openLogStream();
+
+      void (async () => {
+        try {
+          const statusResp = await callInternalApi('/api/dat-khong-nguoi/status', { workerUrl }, session.token);
+          const st = (statusResp.data as any)?.status;
+          if (st) {
+            appendLogs({
+              logs: [{
+                id: `dkn-status-init-${Date.now()}`,
+                kind: st.isRunning ? 'start' : 'stop',
+                message: `Đất Không Người: ${st.isRunning ? 'Đang chạy' : 'Đang chờ'} (Hoàn thành: ${st.completedCount ?? 0}/${st.totalCount ?? 0})`,
+                timestamp: new Date().toISOString(),
+                featureName: DKN_LOG_FEATURE,
+              }]
+            }, DKN_LOG_FEATURE);
+          }
+        } catch {
+          // Silent fail
+        }
+      })();
+    } catch (error) {
+      setLastResult({ success: false, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+    } finally {
+      setLoading(null);
+    }
+  }, [datKhongNguoiForm, session, workerUrl, pushHistory, openLogStream, appendLogs]);
+
+  const handleStopDatKhongNguoi = useCallback(async () => {
+    if (!session) return;
+    setLoading('dat-khong-nguoi');
+    try {
+      const response = await callInternalApi(
+        '/api/dat-khong-nguoi/stop',
+        { workerUrl },
+        session.token
+      );
+      setLastResult(response.data);
+      pushHistory({
+        title: 'Stop Đất Không Người',
+        status: response.status,
+        data: response.data,
+      });
+      appendLogs({
+        logs: [{
+          id: `dkn-stop-req-${Date.now()}`,
+          kind: 'stop',
+          message: 'Đất Không Người: Gửi yêu cầu dừng...',
+          timestamp: new Date().toISOString(),
+          featureName: DKN_LOG_FEATURE,
+        }]
+      }, DKN_LOG_FEATURE);
+    } catch (error) {
+      setLastResult({ success: false, message: error instanceof Error ? error.message : 'Lỗi không xác định' });
+    } finally {
+      setLoading(null);
+    }
+  }, [session, workerUrl, pushHistory, appendLogs]);
+
   return {
     session,
     activeScreen,
@@ -397,6 +637,10 @@ export function useDashboard() {
     setAccountForm,
     upLevelForm,
     setUpLevelForm,
+    sieuBaHoForm,
+    setSieuBaHoForm,
+    datKhongNguoiForm,
+    setDatKhongNguoiForm,
     loading,
     lastResult,
     history,
@@ -405,10 +649,16 @@ export function useDashboard() {
     logConnected,
     logError,
     upLevelStatus,
+    sieuBaHoStatus,
+    datKhongNguoiStatus,
     handleLogin,
     handleAddAccount,
     handleStartUpLevel,
     handleStopUpLevel,
+    handleStartSieuBaHo,
+    handleStopSieuBaHo,
+    handleStartDatKhongNguoi,
+    handleStopDatKhongNguoi,
     loadLogHistory,
     logout,
   };

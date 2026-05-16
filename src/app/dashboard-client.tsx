@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   Radio,
   Server,
+  Crown,
+  Sprout,
 } from 'lucide-react';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { NavItem } from '@/types/dashboard';
@@ -17,6 +19,8 @@ import { LoginSection } from '@/components/dashboard/LoginSection';
 import { OverviewSection } from '@/components/dashboard/OverviewSection';
 import { AccountSection } from '@/components/dashboard/AccountSection';
 import { UpLevelSection } from '@/components/dashboard/UpLevelSection';
+import { SieuBaHoSection } from '@/components/dashboard/SieuBaHoSection';
+import { DatKhongNguoiSection } from '@/components/dashboard/DatKhongNguoiSection';
 import { SettingsSection } from '@/components/dashboard/SettingsSection';
 import { LogViewer } from '@/components/dashboard/LogViewer';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -26,6 +30,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'overview', label: 'Trang chủ', icon: <Gauge size={18} /> },
   { key: 'account', label: 'Tạo account', icon: <UserPlus size={18} /> },
   { key: 'up-level', label: 'Up Level Clone', icon: <Zap size={18} /> },
+  { key: 'sieu-ba-ho', label: 'Siêu Bá Hộ', icon: <Crown size={18} /> },
+  { key: 'dat-khong-nguoi', label: 'Đất Không Người', icon: <Sprout size={18} /> },
   { key: 'logs', label: 'Logs', icon: <Terminal size={18} /> },
   { key: 'settings', label: 'Cài đặt', icon: <Settings size={18} /> },
 ];
@@ -43,6 +49,10 @@ export default function DashboardClient() {
     setAccountForm,
     upLevelForm,
     setUpLevelForm,
+    sieuBaHoForm,
+    setSieuBaHoForm,
+    datKhongNguoiForm,
+    setDatKhongNguoiForm,
     loading,
     lastResult,
     history,
@@ -51,10 +61,16 @@ export default function DashboardClient() {
     logConnected,
     logError,
     upLevelStatus,
+    sieuBaHoStatus,
+    datKhongNguoiStatus,
     handleLogin,
     handleAddAccount,
     handleStartUpLevel,
     handleStopUpLevel,
+    handleStartSieuBaHo,
+    handleStopSieuBaHo,
+    handleStartDatKhongNguoi,
+    handleStopDatKhongNguoi,
     loadLogHistory,
     logout,
   } = useDashboard();
@@ -99,6 +115,38 @@ export default function DashboardClient() {
             onRefreshLogs={() => loadLogHistory()}
             onClearLogs={() => setLogs([])}
             status={upLevelStatus}
+          />
+        );
+      case 'sieu-ba-ho':
+        return (
+          <SieuBaHoSection
+            form={sieuBaHoForm}
+            setForm={setSieuBaHoForm}
+            onSubmit={handleStartSieuBaHo}
+            onStop={handleStopSieuBaHo}
+            loading={loading}
+            logs={logs}
+            logConnected={logConnected}
+            logError={logError}
+            onRefreshLogs={() => loadLogHistory()}
+            onClearLogs={() => setLogs([])}
+            status={sieuBaHoStatus}
+          />
+        );
+      case 'dat-khong-nguoi':
+        return (
+          <DatKhongNguoiSection
+            form={datKhongNguoiForm}
+            setForm={setDatKhongNguoiForm}
+            onSubmit={handleStartDatKhongNguoi}
+            onStop={handleStopDatKhongNguoi}
+            loading={loading}
+            logs={logs}
+            logConnected={logConnected}
+            logError={logError}
+            onRefreshLogs={() => loadLogHistory()}
+            onClearLogs={() => setLogs([])}
+            status={datKhongNguoiStatus}
           />
         );
       case 'logs':

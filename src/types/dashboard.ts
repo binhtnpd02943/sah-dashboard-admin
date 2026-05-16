@@ -1,11 +1,13 @@
 import { ReactNode } from 'react';
 
-export type ActiveScreen = 'overview' | 'account' | 'up-level' | 'logs' | 'settings';
+export type ActiveScreen = 'overview' | 'account' | 'up-level' | 'sieu-ba-ho' | 'dat-khong-nguoi' | 'logs' | 'settings';
 
 export type LoadingAction =
   | 'login'
   | 'account'
   | 'up-level'
+  | 'sieu-ba-ho'
+  | 'dat-khong-nguoi'
   | 'history'
   | 'stream'
   | null;
@@ -67,6 +69,49 @@ export type LogItem = {
 };
 
 export type UpLevelStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  currentQueue: any[];
+  completedCount: number;
+  totalCount: number;
+};
+
+export type SieuBaHoForm = {
+  configIds: string;
+  delay: number;
+  concurrency: number;
+  maxAuto: number;
+  buyItems: boolean;
+  runMode: 'play' | 'auto';
+  buyShopIndex: string;
+  buyShopSlot: string;
+  buyQuantity: number;
+  logFull: boolean;
+  proxyMode: 'off' | 'dedicated';
+};
+
+export type SieuBaHoStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  currentQueue: any[];
+  completedCount: number;
+  totalCount: number;
+};
+
+export type DatKhongNguoiForm = {
+  configIds: string;
+  delay: number;
+  concurrency: number;
+  loaiHatGiong: string;
+  tromNroMode: boolean;
+  autoCanBinh: boolean;
+  mode: 'trom' | 'trong';
+  logFull: boolean;
+  proxyMode: 'off' | 'dedicated';
+  forceStart: boolean;
+};
+
+export type DatKhongNguoiStatus = {
   isRunning: boolean;
   startedAt: string | null;
   currentQueue: any[];

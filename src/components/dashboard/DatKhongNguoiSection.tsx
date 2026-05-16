@@ -1,0 +1,278 @@
+'use client';
+
+import { Play, Square, Sprout } from 'lucide-react';
+import { DatKhongNguoiForm, LoadingAction, LogItem, DatKhongNguoiStatus } from '@/types/dashboard';
+import { FieldLabel } from '@/components/ui/FieldLabel';
+import { IconButton } from '@/components/ui/IconButton';
+import { LogViewer } from '@/components/dashboard/LogViewer';
+import { safeStringify } from '@/services/api-client';
+import { motion } from 'framer-motion';
+import { StatusPill } from '@/components/ui/StatusPill';
+
+interface DatKhongNguoiSectionProps {
+  form: DatKhongNguoiForm;
+  setForm: (form: DatKhongNguoiForm | ((prev: DatKhongNguoiForm) => DatKhongNguoiForm)) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onStop: () => void;
+  loading: LoadingAction;
+  logs: LogItem[];
+  logConnected: boolean;
+  logError: string;
+  onRefreshLogs: () => void;
+  onClearLogs: () => void;
+  status: DatKhongNguoiStatus | null;
+}
+
+export function DatKhongNguoiSection({
+  form,
+  setForm,
+  onSubmit,
+  onStop,
+  loading,
+  logs,
+  logConnected,
+  logError,
+  onRefreshLogs,
+  onClearLogs,
+  status,
+}: DatKhongNguoiSectionProps) {
+  const parsedConfigIds = form.configIds
+    .split(/\r?\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const previewPayload = {
+    configIds: parsedConfigIds,
+    delay: form.delay,
+    concurrency: form.concurrency,
+    loaiHatGiong: form.loaiHatGiong,
+    tromNroMode: String(form.tromNroMode),
+    autoCanBinh: String(form.autoCanBinh),
+    mode: form.mode,
+    logFull: form.logFull,
+    proxyMode: form.proxyMode,
+    forceStart: form.forceStart,
+  };
+
+  const isBusy = loading === 'dat-khong-nguoi';
+
+  const modeColor = form.mode === 'trom' ? 'text-orange-400' : 'text-emerald-400';
+  const modeAccent = form.mode === 'trom' ? '#fb923c' : '#34d399';
+
+  return (
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,0.85fr)]">
+      <motion.form
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        onSubmit={onSubmit}
+        className="card-panel rounded-[30px] p-6 h-fit"
+      >
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted">
+              Feature
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-main">Đất Không Người</h3>
+          </div>
+          <span className="rounded-2xl p-3" style={{ backgroundColor: `${modeAccent}18`, color: modeAccent }}>
+            <Sprout size={22} />
+          </span>
+        </div>
+
+        {/* Mode toggle — prominent */}
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          {(['trom', 'trong'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, mode: m }))}
+              className={[
+                'rounded-2xl border py-3 text-sm font-black transition-all',
+                form.mode === m
+                  ? m === 'trom'
+                    ? 'border-orange-400/60 bg-orange-400/10 text-orange-400'
+                    : 'border-emerald-400/60 bg-emerald-400/10 text-emerald-400'
+                  : 'border-main bg-input text-muted hover:border-main hover:text-main',
+              ].join(' ')}
+            >
+              {m === 'trom' ? '🗡️ Trộm' : '🌱 Trồng'}
+            </button>
+          ))}
+        </div>
+
+        {/* Status card */}
+        <div className="mb-8 p-4 rounded-2xl bg-black/20 border border-main">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted">
+              Trạng thái hệ thống
+            </span>
+            <StatusPill tone={status?.isRunning ? 'success' : 'neutral'}>
+              {status?.isRunning ? 'Đang chạy' : 'Đang chờ'}
+            </StatusPill>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 rounded-xl bg-black/20 border border-main">
+              <p className="text-[9px] font-black uppercase text-muted mb-1">Hoàn thành</p>
+              <p className="text-lg font-black text-main">
+                {status?.completedCount ?? 0} / {status?.totalCount ?? 0}
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/20 border border-main">
+              <p className="text-[9px] font-black uppercase text-muted mb-1">Hàng đợi</p>
+              <p className={`text-lg font-black ${modeColor}`}>
+                {status?.currentQueue?.length ?? 0}
+              </p>
+            </div>
+          </div>
+
+          {status?.isRunning && (status.totalCount ?? 0) > 0 && (
+            <div className="mt-4">
+              <div className="h-1.5 w-full bg-black/30 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${((status.completedCount ?? 0) / (status.totalCount ?? 1)) * 100}%`,
+                  }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: modeAccent, boxShadow: `0 0 10px ${modeAccent}80` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Form fields */}
+        <div className="grid gap-5">
+          {/* Config IDs */}
+          <FieldLabel label="Config IDs">
+            <textarea
+              value={form.configIds}
+              onChange={(e) => setForm((prev) => ({ ...prev, configIds: e.target.value }))}
+              className="field min-h-32 rounded-2xl px-4 py-3 font-mono text-[13px] leading-relaxed"
+              placeholder={'vr3147486492\nvr2045220784'}
+              required
+            />
+          </FieldLabel>
+
+          {/* Delay / Concurrency / Loại hạt giống */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FieldLabel label="Delay (ms)">
+              <input
+                type="number"
+                min={100}
+                value={form.delay}
+                onChange={(e) => setForm((prev) => ({ ...prev, delay: Number(e.target.value) }))}
+                className="field min-h-12 rounded-2xl px-4 py-3 text-sm"
+              />
+            </FieldLabel>
+            <FieldLabel label="Concurrency">
+              <input
+                type="number"
+                min={1}
+                value={form.concurrency}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, concurrency: Number(e.target.value) }))
+                }
+                className="field min-h-12 rounded-2xl px-4 py-3 text-sm"
+              />
+            </FieldLabel>
+            <FieldLabel label="Loại hạt giống">
+              <input
+                type="text"
+                value={form.loaiHatGiong}
+                onChange={(e) => setForm((prev) => ({ ...prev, loaiHatGiong: e.target.value }))}
+                className="field min-h-12 rounded-2xl px-4 py-3 text-sm"
+                placeholder="39"
+              />
+            </FieldLabel>
+          </div>
+
+          {/* Proxy Mode */}
+          <FieldLabel label="Proxy Mode">
+            <select
+              value={form.proxyMode}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  proxyMode: e.target.value as DatKhongNguoiForm['proxyMode'],
+                }))
+              }
+              className="field min-h-12 rounded-2xl px-4 py-3 text-sm"
+            >
+              <option value="off">Off</option>
+              <option value="dedicated">Dedicated</option>
+            </select>
+          </FieldLabel>
+
+          {/* Checkbox options */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ['tromNroMode', 'Trộm NRO Mode'],
+                ['autoCanBinh', 'Auto cân bình'],
+                ['logFull', 'Log full'],
+                ['forceStart', 'Force start'],
+              ] as Array<[keyof DatKhongNguoiForm, string]>
+            ).map(([key, label]) => (
+              <label
+                key={key}
+                className="flex min-h-12 items-center gap-3 rounded-2xl border border-main bg-input px-4 py-3 text-[12px] font-bold text-main cursor-pointer hover:border-emerald-400/40 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(form[key])}
+                  onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.checked }))}
+                  className="h-4 w-4 rounded"
+                  style={{ accentColor: modeAccent }}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="mt-8 flex gap-3">
+          <IconButton
+            type="submit"
+            className="btn-primary flex-1"
+            loading={isBusy}
+            disabled={parsedConfigIds.length === 0}
+            icon={<Play size={16} />}
+          >
+            Chạy {form.mode === 'trom' ? 'Trộm' : 'Trồng'} ({parsedConfigIds.length})
+          </IconButton>
+          <IconButton
+            type="button"
+            onClick={onStop}
+            className="btn-danger px-6"
+            loading={isBusy}
+            icon={<Square size={16} fill="currentColor" />}
+          >
+            Stop
+          </IconButton>
+        </div>
+
+        {/* Payload preview */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted mb-3">
+            Payload Preview
+          </p>
+          <pre className="overflow-auto rounded-2xl border border-main bg-black/24 p-4 font-mono text-[10px] leading-relaxed text-muted scrollbar-hide">
+            {safeStringify(previewPayload)}
+          </pre>
+        </motion.div>
+      </motion.form>
+
+      <LogViewer
+        logs={logs}
+        connected={logConnected}
+        error={logError}
+        onRefresh={onRefreshLogs}
+        onClear={onClearLogs}
+      />
+    </section>
+  );
+}
